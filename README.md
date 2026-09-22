@@ -1,21 +1,33 @@
-# Two versions of one connector plugin on one Connect cluster
+# Three versions of one connector plugin on one Connect cluster
 
-Kafka Connect can run several versions of the same connector plugin in one
-worker (KIP-891, Apache Kafka 4.1, Confluent Platform 8.x). This repository
-runs it under Confluent for Kubernetes: three versions of `kafka-connect-jdbc`
-on one worker, three connectors, each on a different version.
+Verified: 2026-09-22 on Confluent for Kubernetes 3.3.0, Confluent Platform 8.3.2, kind.
+
+## What we test
+
+Can one Kafka Connect cluster run three versions of the same connector plugin
+at the same time, when Confluent for Kubernetes manages the cluster?
+
+Three things must be true:
+
+1. Each plugin version is in its own directory on `plugin.path`.
+2. `GET /connector-plugins` lists the plugin once per version.
+3. A connector config names a version with `connector.plugin.version`, and
+   the worker loads that version.
+
+We install `kafka-connect-jdbc` 10.9.7, 10.9.8 and 10.9.9 on one worker. We
+apply three connectors: two pinned, one without a pin. We read the catalog and
+the status of each connector.
 
 ## How it works
 
 1. Each plugin version sits in its own directory on `plugin.path`. The worker
-   gives each directory its own classloader.
+   gives each directory its own classloader (KIP-146).
 2. At startup the worker calls each plugin's `version()` method. The result is
-   the version in the catalog. `GET /connector-plugins` lists the plugin once
-   per version.
+   the version in the catalog (KIP-891, Apache Kafka 4.1).
 3. A connector config selects a version with `connector.plugin.version`. A bare
    value is exact. No value means the newest installed version.
 
-The operator's `spec.build.onDemand` cannot create the directories: its
+The operator's `spec.build.onDemand` cannot create the directories. Its
 installer writes every version into the same directory, and the last one wins.
 So the directories are created another way. This repository shows two:
 
@@ -73,36 +85,54 @@ kubectl apply -f k8s/40-connectors.yaml
 
 ## Look
 
+Open a port-forward once:
+
 ```bash
 kubectl port-forward connect-0 8085:8083 &
-C=http://localhost:8085
-
-# one plugin, three versions
-curl -s $C/connector-plugins \
-  | jq -r '.[] | select(.class | test("JdbcSource")) | "\(.class) \(.version)"'
-
-# three connectors, three versions
-for c in jdbc-10-9-7 jdbc-10-9-8 jdbc-latest; do
-  curl -s $C/connectors/$c/status \
-    | jq -r '"\(.name): \(.connector.state) \(.connector.version)"'
-done
-
-# rows moved by each connector
-for t in pg-10-9-7-items pg-10-9-8-items pg-latest-items; do
-  kubectl exec kafka-0 -c kafka -- kafka-get-offsets --bootstrap-server localhost:9071 --topic $t
-done
+sleep 3
 ```
 
-Expected:
+One plugin, three versions:
+
+```bash
+curl -s localhost:8085/connector-plugins \
+  | jq -r '.[] | select(.class | test("JdbcSource")) | "\(.class) \(.version)"'
+```
 
 ```
 io.confluent.connect.jdbc.JdbcSourceConnector 10.9.7
 io.confluent.connect.jdbc.JdbcSourceConnector 10.9.8
 io.confluent.connect.jdbc.JdbcSourceConnector 10.9.9
+```
+
+Three connectors, three versions:
+
+```bash
+for c in jdbc-10-9-7 jdbc-10-9-8 jdbc-latest; do
+  curl -s localhost:8085/connectors/$c/status \
+    | jq -r '"\(.name): \(.connector.state) \(.connector.version)"'
+done
+```
+
+```
 jdbc-10-9-7: RUNNING 10.9.7
 jdbc-10-9-8: RUNNING 10.9.8
 jdbc-latest: RUNNING 10.9.9
 ```
+
+Rows moved by each connector. The numbers grow by three every poll:
+
+```bash
+for t in pg-10-9-7-items pg-10-9-8-items pg-latest-items; do
+  kubectl exec kafka-0 -c kafka -- kafka-get-offsets --bootstrap-server localhost:9071 --topic $t
+done
+```
+
+## Expected
+
+The catalog lists `JdbcSourceConnector` three times, once per version. Each
+connector is RUNNING at the version its config names. The unpinned connector
+runs the newest, 10.9.9. All three topics receive rows.
 
 ## Notes
 
