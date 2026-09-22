@@ -1,0 +1,43 @@
+# Volume route. A Job downloads each version into its own directory on a PersistentVolumeClaim.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: connect-plugins
+  namespace: confluent
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fill-connect-plugins
+  namespace: confluent
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: fill
+          image: alpine:3.20
+          command: ["sh", "-ec"]
+          args:
+            - |
+              apk add --no-cache unzip >/dev/null
+              BASE=https://hub-downloads.confluent.io/api/plugins/confluentinc/kafka-connect-jdbc/versions
+              for V in 10.9.7 10.9.8 10.9.9; do
+                [ -d /plugins/jdbc-$V/lib ] && continue
+                wget -q -O /tmp/p.zip $BASE/$V/confluentinc-kafka-connect-jdbc-$V.zip
+                rm -rf /tmp/x && mkdir /tmp/x && unzip -q /tmp/p.zip -d /tmp/x
+                mv /tmp/x/* /plugins/jdbc-$V
+              done
+              chown -R 1001:0 /plugins; chmod -R a+rX /plugins
+              ls -1 /plugins
+          volumeMounts:
+            - {name: plugins, mountPath: /plugins}
+      volumes:
+        - name: plugins
+          persistentVolumeClaim: {claimName: connect-plugins}

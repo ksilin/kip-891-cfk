@@ -1,0 +1,33 @@
+# The operator sets auto.create.topics.enable=false, so source topics are created here.
+apiVersion: platform.confluent.io/v1beta1
+kind: KafkaTopic
+metadata:
+  name: pg-10-9-7-items
+  namespace: confluent
+spec:
+  replicas: 1
+  partitionCount: 1
+  kafkaClusterRef:
+    name: kafka
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: KafkaTopic
+metadata:
+  name: pg-10-9-8-items
+  namespace: confluent
+spec:
+  replicas: 1
+  partitionCount: 1
+  kafkaClusterRef:
+    name: kafka
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: KafkaTopic
+metadata:
+  name: pg-latest-items
+  namespace: confluent
+spec:
+  replicas: 1
+  partitionCount: 1
+  kafkaClusterRef:
+    name: kafka

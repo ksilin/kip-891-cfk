@@ -1,0 +1,60 @@
+# Three connectors, same class, one worker. Two are pinned; the third has no pin and gets the newest version.
+apiVersion: platform.confluent.io/v1beta1
+kind: Connector
+metadata:
+  name: jdbc-10-9-7
+  namespace: confluent
+spec:
+  class: io.confluent.connect.jdbc.JdbcSourceConnector
+  taskMax: 1
+  connectClusterRef:
+    name: connect
+  configs:
+    connector.plugin.version: "10.9.7"
+    connection.url: jdbc:postgresql://postgres.confluent.svc.cluster.local:5432/demo
+    connection.user: demo
+    connection.password: demo
+    mode: bulk
+    table.whitelist: items
+    topic.prefix: pg-10-9-7-
+    poll.interval.ms: "60000"
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: Connector
+metadata:
+  name: jdbc-10-9-8
+  namespace: confluent
+spec:
+  class: io.confluent.connect.jdbc.JdbcSourceConnector
+  taskMax: 1
+  connectClusterRef:
+    name: connect
+  configs:
+    connector.plugin.version: "10.9.8"
+    connection.url: jdbc:postgresql://postgres.confluent.svc.cluster.local:5432/demo
+    connection.user: demo
+    connection.password: demo
+    mode: bulk
+    table.whitelist: items
+    topic.prefix: pg-10-9-8-
+    poll.interval.ms: "60000"
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: Connector
+metadata:
+  name: jdbc-latest
+  namespace: confluent
+spec:
+  class: io.confluent.connect.jdbc.JdbcSourceConnector
+  taskMax: 1
+  connectClusterRef:
+    name: connect
+  configs:
+    # no connector.plugin.version: the newest installed version
+    connection.url: jdbc:postgresql://postgres.confluent.svc.cluster.local:5432/demo
+    connection.user: demo
+    connection.password: demo
+    mode: bulk
+    table.whitelist: items
+    topic.prefix: pg-latest-
+    poll.interval.ms: "60000"

@@ -1,0 +1,19 @@
+# Image route. The three plugin directories are inside the image. No spec.build.
+apiVersion: platform.confluent.io/v1beta1
+kind: Connect
+metadata:
+  name: connect
+  namespace: confluent
+spec:
+  replicas: 1
+  image:
+    application: kip891/connect-jdbc-3v:8.3.2
+    init: confluentinc/confluent-init-container:3.3.0
+  configOverrides:
+    jvm:
+      - "-Xmx640m"
+      - "-Xms256m"
+    server:
+      - config.storage.replication.factor=1
+      - offset.storage.replication.factor=1
+      - status.storage.replication.factor=1

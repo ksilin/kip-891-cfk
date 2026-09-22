@@ -1,0 +1,52 @@
+# One Postgres pod with one seeded table for the JDBC source connector.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: confluent
+data:
+  init.sql: |
+    CREATE TABLE items (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      updated_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+    INSERT INTO items (name) VALUES ('alpha'), ('beta'), ('gamma');
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: confluent
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: postgres}
+  template:
+    metadata:
+      labels: {app: postgres}
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - {name: POSTGRES_USER, value: demo}
+            - {name: POSTGRES_PASSWORD, value: demo}
+            - {name: POSTGRES_DB, value: demo}
+          ports: [{containerPort: 5432}]
+          volumeMounts:
+            - {name: init, mountPath: /docker-entrypoint-initdb.d}
+          resources:
+            requests: {memory: 64Mi, cpu: 50m}
+      volumes:
+        - name: init
+          configMap: {name: postgres-init}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: confluent
+spec:
+  selector: {app: postgres}
+  ports: [{port: 5432, targetPort: 5432}]
